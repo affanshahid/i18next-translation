@@ -33,9 +33,18 @@
     "minify": true
   },
   "dependencies": {
-    "@stricli/core": "^1.1.2"
+    "@aws-sdk/client-translate": "^3.839.0",
+    "@stricli/core": "^1.1.2",
+    "chalk": "^5.4.1",
+    "dotenv": "^17.0.0",
+    "flat": "^6.0.1",
+    "lodash.chunk": "^4.2.0",
+    "ora": "^8.2.0",
+    "smol-toml": "^1.4.0",
+    "yaml": "^2.8.0"
   },
   "devDependencies": {
+    "@types/lodash.chunk": "^4.2.9",
     "@types/node": "24.x",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",

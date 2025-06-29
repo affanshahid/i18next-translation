@@ -1,6 +1,9 @@
 import { buildApplication, buildRouteMap } from '@stricli/core';
+import { config } from 'dotenv';
 import { description, name, version } from '../package.json';
 import { translateCommand } from './command';
+
+config({ quiet: true });
 
 const routes = buildRouteMap({
   defaultCommand: 'translate',
