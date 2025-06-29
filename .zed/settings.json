@@ -1,0 +1,9 @@
+{
+  "language_servers": [
+    "!deno",
+    "!typescript-language-server",
+    "!graphql",
+    "oxc",
+    "..."
+  ]
+}

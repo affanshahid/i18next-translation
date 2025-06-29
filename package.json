@@ -1,0 +1,53 @@
+{
+  "name": "i18next-translate",
+  "description": "Automatically translate your i18next dictionaries.",
+  "author": "Affan Shahid <affan.shahid.94@gmail.com> (https://affanshahid.dev)",
+  "license": "MIT",
+  "type": "module",
+  "version": "0.0.1",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "i18next-translate": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx ./src/bin/cli.ts",
+    "prebuild": "tsc",
+    "build": "tsup",
+    "prepublishOnly": "npm run build",
+    "prepare": "husky install"
+  },
+  "tsup": {
+    "entry": [
+      "src/bin/cli.ts"
+    ],
+    "format": [
+      "esm"
+    ],
+    "clean": true,
+    "splitting": true,
+    "minify": true
+  },
+  "dependencies": {
+    "@stricli/core": "^1.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.x",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "oxlint": "^1.3.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-organize-imports": "^4.1.0",
+    "tsup": "^6.7.0",
+    "tsx": "^4.20.3",
+    "typescript": "5.6.x"
+  },
+  "lint-staged": {
+    "*.{js,ts,md,json}": "prettier --write",
+    "**/*.{js,ts}": "oxlint"
+  }
+}
