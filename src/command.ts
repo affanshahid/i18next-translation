@@ -18,7 +18,7 @@ import {
 interface Flags {
   sourceLanguage: string;
   provider: 'AWS' | 'OpenAI' | 'Anthropic';
-  only?: string;
+  only?: OnlySpec;
   concurrency: number;
 }
 
@@ -27,27 +27,58 @@ type Serializer = (obj: any) => string;
 
 const REGEX_LANGUAGE_CODE = /^(?:[a-zA-Z]{2,4}|[a-zA-Z]{2}-[a-zA-Z]{2})$/;
 
-interface TranslateNamespaceParams {
+interface OnlySpec {
+  prefixMatch: boolean;
+  namespace: string;
+  path: string;
+}
+
+function parseOnly(only: string): OnlySpec {
+  const [namespace, path] = only.split(':');
+
+  if (!namespace || !path) {
+    throw new Error(
+      'Invalid format for --only. Expected format: namespace:path',
+    );
+  }
+
+  const prefixMatch = path?.endsWith('*');
+  return {
+    prefixMatch,
+    namespace,
+    path: prefixMatch ? path.slice(0, -1) : path,
+  };
+}
+
+interface ProcessNamespaceParams {
   translator: Translator;
   concurrency: number;
   ns: any;
   sourceLanguage: string;
   targetLanguage: string;
   existing?: any;
+  only?: OnlySpec;
 }
 
-async function translateNamespace({
+async function processNamespace({
   translator,
   concurrency,
   ns,
   sourceLanguage,
   targetLanguage,
   existing,
-}: TranslateNamespaceParams): Promise<any> {
+  only,
+}: ProcessNamespaceParams): Promise<any> {
   const flattened = flatten<any, Record<string, string>>(ns);
   let ret = existing ? flatten<any, Record<string, string>>(existing) : {};
 
-  const sources = Object.entries(flattened).filter(([key]) => !ret[key]);
+  let sources = Object.entries(flattened);
+
+  if (only)
+    sources = sources.filter(([key]) =>
+      only.prefixMatch ? key.startsWith(only.path) : key === only.path,
+    );
+  else sources = sources.filter(([key]) => !ret[key]);
 
   const chunks = chunk(sources, concurrency);
   for (const currentChunk of chunks) {
@@ -82,9 +113,13 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
 
       return result;
     })
-    .map(([path]) => path);
+    .map(([path]) => path)
+    .filter((p) => p !== flags.sourceLanguage);
 
-  const sources = await readdir(join(dictsPath, flags.sourceLanguage));
+  let sources = await readdir(join(dictsPath, flags.sourceLanguage));
+
+  const only = flags.only;
+  if (only) sources = sources.filter((s) => s.split('.')[0] === only.namespace);
 
   let translator: Translator;
   switch (flags.provider) {
@@ -103,7 +138,9 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
 
   const validationError = await translator.validateConfiguration();
   if (validationError) {
-    console.log('Translator configuration invalid:', validationError);
+    console.log(
+      chalk.redBright('Translator configuration invalid:', validationError),
+    );
     this.process.exit(1);
   }
 
@@ -146,13 +183,14 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
           .then((t) => parse(t))
           .catch(() => undefined);
 
-        const translation = await translateNamespace({
+        const translation = await processNamespace({
           translator,
           concurrency: flags.concurrency,
           ns,
           targetLanguage: target,
           sourceLanguage: flags.sourceLanguage,
           existing,
+          only,
         });
         await writeFile(targetPath, serialize(translation) + '\n');
       }
@@ -192,7 +230,7 @@ export const translateCommand = buildCommand({
         kind: 'parsed',
         brief:
           'Specific key to (re-)translate. Supports JSON paths and wildcards using *.',
-        parse: String,
+        parse: parseOnly,
         optional: true,
       },
       concurrency: {

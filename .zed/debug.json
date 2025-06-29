@@ -1,0 +1,11 @@
+[
+  {
+    "label": "Debug",
+    "request": "launch",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "runtimeExecutable": "./node_modules/.bin/tsx",
+    "program": "./src/bin/cli.ts",
+    "args": []
+  }
+]
