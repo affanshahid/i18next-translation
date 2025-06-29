@@ -20,6 +20,7 @@ interface Flags {
   provider: 'AWS' | 'OpenAI' | 'Anthropic';
   only?: OnlySpec;
   concurrency: number;
+  strict: boolean;
 }
 
 type Parser = (raw: string) => any;
@@ -58,6 +59,7 @@ interface ProcessNamespaceParams {
   targetLanguage: string;
   existing?: any;
   only?: OnlySpec;
+  strict: boolean;
 }
 
 async function processNamespace({
@@ -68,6 +70,7 @@ async function processNamespace({
   targetLanguage,
   existing,
   only,
+  strict,
 }: ProcessNamespaceParams): Promise<any> {
   const flattened = flatten<any, Record<string, string>>(ns);
   let ret = existing ? flatten<any, Record<string, string>>(existing) : {};
@@ -92,6 +95,14 @@ async function processNamespace({
       ...ret,
       ...resp,
     };
+  }
+
+  if (strict) {
+    const keys = Object.entries(flattened).map(([key]) => key);
+
+    for (const key of Object.keys(ret)) {
+      if (!keys.includes(key)) delete ret[key];
+    }
   }
 
   return unflatten(ret, { object: false });
@@ -191,6 +202,7 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
           sourceLanguage: flags.sourceLanguage,
           existing,
           only,
+          strict: flags.strict,
         });
         await writeFile(targetPath, serialize(translation) + '\n');
       }
@@ -238,6 +250,10 @@ export const translateCommand = buildCommand({
         brief: 'Parallelization factor',
         parse: numberParser,
         default: '10',
+      },
+      strict: {
+        kind: 'boolean',
+        brief: 'Only keep keys present in the source dictionary',
       },
     },
 
