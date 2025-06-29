@@ -1,13 +1,13 @@
-# i18next-translate
+# i18next-translation
 
 Automatically translate your i18next dictionaries using AI-powered translation services.
 
-[![npm version](https://badge.fury.io/js/i18next-translate.svg)](https://badge.fury.io/js/i18next-translate)
+[![npm version](https://badge.fury.io/js/i18next-translation.svg)](https://badge.fury.io/js/i18next-translation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-`i18next-translate` is a CLI tool that automatically translates your i18next dictionaries from a source language to multiple target languages. It supports multiple translation providers including AWS Translate, OpenAI GPT-4, and Anthropic Claude, and works with JSON, YAML, and TOML file formats.
+`i18next-translation` is a CLI tool that automatically translates your i18next dictionaries from a source language to multiple target languages. It supports multiple translation providers including AWS Translate, OpenAI GPT-4, and Anthropic Claude, and works with JSON, YAML, and TOML file formats.
 
 ## Features
 
@@ -27,19 +27,19 @@ Automatically translate your i18next dictionaries using AI-powered translation s
 ### Global Installation
 
 ```bash
-npm install -g i18next-translate
+npm install -g i18next-translation
 ```
 
 ### Local Installation (Recommended)
 
 ```bash
-npm install --save-dev i18next-translate
+npm install --save-dev i18next-translation
 ```
 
 ### Using without Installation
 
 ```bash
-npx i18next-translate [options] <dicts-path>
+npx i18next-translation [options] <dicts-path>
 ```
 
 ## Usage
@@ -47,7 +47,7 @@ npx i18next-translate [options] <dicts-path>
 ### Basic Usage
 
 ```bash
-i18next-translate -s en-US ./locales
+i18next-translation -s en-US ./locales
 ```
 
 This will translate all dictionaries from `en-US` to all other language directories found in `./locales`.
@@ -75,44 +75,44 @@ Language directories must follow ISO language codes (e.g., `en`, `es`, `fr`, `de
 
 ```bash
 # Use AWS (default -- must configure AWS credentials)
-i18next-translate -s en-US -p AWS ./locales
+i18next-translation -s en-US -p AWS ./locales
 
 # Use OpenAI (must set OPENAI_API_KEY)
-i18next-translate -s en-US -p OpenAI ./locales
+i18next-translation -s en-US -p OpenAI ./locales
 
 # Use Anthropic (must set ANTHROPIC_API_KEY)
-i18next-translate -s en-US -p Anthropic ./locales
+i18next-translation -s en-US -p Anthropic ./locales
 ```
 
 #### Translate Specific Namespace
 
 ```bash
 # Only translate the 'auth' namespace
-i18next-translate -s en-US --only "auth:*" ./locales
+i18next-translation -s en-US --only "auth:*" ./locales
 ```
 
 #### Translate Specific Keys
 
 ```bash
 # Translate specific key
-i18next-translate -s en-US --only "common:welcome" ./locales
+i18next-translation -s en-US --only "common:welcome" ./locales
 
 # Translate keys with prefix
-i18next-translate -s en-US --only "common:error.*" ./locales
+i18next-translation -s en-US --only "common:error.*" ./locales
 ```
 
 #### Control Concurrency
 
 ```bash
 # Process 5 keys simultaneously (default: 10)
-i18next-translate -s en-US --concurrency 5 ./locales
+i18next-translation -s en-US --concurrency 5 ./locales
 ```
 
 #### Strict Mode
 
 ```bash
 # Remove keys that don't exist in source language
-i18next-translate -s en-US --strict ./locales
+i18next-translation -s en-US --strict ./locales
 ```
 
 ## Command Line Options
@@ -197,7 +197,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 ```json
 {
   "scripts": {
-    "translate": "i18next-translate -s en-US ./src/locales"
+    "translate": "i18next-translation -s en-US ./src/locales"
   }
 }
 ```
@@ -208,7 +208,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 {
   "husky": {
     "hooks": {
-      "pre-commit": "i18next-translate -s en-US --strict ./locales"
+      "pre-commit": "i18next-translation -s en-US --strict ./locales"
     }
   }
 }
@@ -238,19 +238,19 @@ The tool validates language codes against ISO standards. If a directory is skipp
 
 ```bash
 # 1. Initial translation setup
-i18next-translate -s en-US ./locales
+i18next-translation -s en-US ./locales
 
 # 2. Add new keys to English files
 echo '{"newFeature": "New Feature"}' > locales/en/features.json
 
 # 3. Translate only new keys
-i18next-translate -s en-US ./locales
+i18next-translation -s en-US ./locales
 
 # 4. Translate specific namespace with OpenAI
-i18next-translate -s en-US -p OpenAI --only "marketing:*" ./locales
+i18next-translation -s en-US -p OpenAI --only "marketing:*" ./locales
 
 # 5. Clean up unused keys
-i18next-translate -s en-US --strict ./locales
+i18next-translation -s en-US --strict ./locales
 ```
 
 ## Contributing
@@ -263,6 +263,6 @@ MIT © [Affan Shahid](https://affanshahid.dev)
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/affanshahid/i18next-translate/issues)
-- 💬 [Discussions](https://github.com/affanshahid/i18next-translate/discussions)
+- 🐛 [Report Issues](https://github.com/affanshahid/i18next-translation/issues)
+- 💬 [Discussions](https://github.com/affanshahid/i18next-translation/discussions)
 - 📧 [Email](mailto:affan.shahid.94@gmail.com)

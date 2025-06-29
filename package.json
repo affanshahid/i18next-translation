@@ -1,15 +1,20 @@
 {
-  "name": "i18next-translate",
+  "name": "i18next-translation",
   "description": "Automatically translate your i18next dictionaries.",
   "author": "Affan Shahid <affan.shahid.94@gmail.com> (https://affanshahid.dev)",
   "license": "MIT",
   "type": "module",
   "version": "0.0.1",
+  "keywords": [
+    "i18next",
+    "auto",
+    "translate"
+  ],
   "files": [
     "dist"
   ],
   "bin": {
-    "i18next-translate": "dist/cli.js"
+    "i18next-translation": "dist/cli.js"
   },
   "engines": {
     "node": ">=20"
