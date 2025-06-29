@@ -264,5 +264,4 @@ MIT © [Affan Shahid](https://affanshahid.dev)
 ## Support
 
 - 🐛 [Report Issues](https://github.com/affanshahid/i18next-translation/issues)
-- 💬 [Discussions](https://github.com/affanshahid/i18next-translation/discussions)
 - 📧 [Email](mailto:affan.shahid.94@gmail.com)
