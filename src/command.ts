@@ -8,8 +8,12 @@ import { extname, join } from 'path';
 import * as toml from 'smol-toml';
 import * as yaml from 'yaml';
 import type { LocalContext } from './context';
-import { AwsTranslator } from './translator/aws';
-import type { Translator } from './translator/base';
+import {
+  AnthropicTranslator,
+  AwsTranslator,
+  OpenAiTranslator,
+  type Translator,
+} from './translator';
 
 interface Flags {
   sourceLanguage: string;
@@ -86,6 +90,12 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
   switch (flags.provider) {
     case 'AWS':
       translator = new AwsTranslator();
+      break;
+    case 'OpenAI':
+      translator = new OpenAiTranslator();
+      break;
+    case 'Anthropic':
+      translator = new AnthropicTranslator();
       break;
     default:
       throw new Error(`Unsupported provider: ${flags.provider}`);
