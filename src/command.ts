@@ -1,121 +1,56 @@
 import { buildCommand, numberParser } from '@stricli/core';
 import chalk from 'chalk';
-import { flatten, unflatten } from 'flat';
-import { readdir, readFile, stat, writeFile } from 'fs/promises';
-import chunk from 'lodash.chunk';
+import { readdir, stat } from 'fs/promises';
 import ora from 'ora';
-import { extname, join } from 'path';
-import * as toml from 'smol-toml';
-import * as yaml from 'yaml';
+import { join } from 'path';
 import type { LocalContext } from './context';
+import { Namespace, TranslationKey } from './namespace';
 import {
   AnthropicTranslator,
   AwsTranslator,
   OpenAiTranslator,
   type Translator,
 } from './translator';
+import type { TranslationUnit } from './translator/base';
+
+const REGEX_LANGUAGE_CODE = /^(?:[a-zA-Z]{2,4}|[a-zA-Z]{2}-[a-zA-Z]{2})$/;
+
+interface OnlySpec {
+  prefixMatch: boolean;
+  key: TranslationKey;
+}
 
 interface Flags {
-  sourceLanguage: string;
+  sourceLocale: string;
   provider: 'AWS' | 'OpenAI' | 'Anthropic';
   only?: OnlySpec;
   concurrency: number;
   strict: boolean;
 }
 
-type Parser = (raw: string) => any;
-type Serializer = (obj: any) => string;
-
-const REGEX_LANGUAGE_CODE = /^(?:[a-zA-Z]{2,4}|[a-zA-Z]{2}-[a-zA-Z]{2})$/;
-
-interface OnlySpec {
-  prefixMatch: boolean;
-  namespace: string;
-  path: string;
-}
-
-function parseOnly(only: string): OnlySpec {
-  const [namespace, path] = only.split(':');
-
-  if (!namespace || !path) {
-    throw new Error(
-      'Invalid format for --only. Expected format: namespace:path',
-    );
+function getTranslator(provider: Flags['provider']): Translator {
+  switch (provider) {
+    case 'AWS':
+      return new AwsTranslator();
+    case 'OpenAI':
+      return new OpenAiTranslator();
+    case 'Anthropic':
+      return new AnthropicTranslator();
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
   }
-
-  const prefixMatch = path?.endsWith('*');
-  return {
-    prefixMatch,
-    namespace,
-    path: prefixMatch ? path.slice(0, -1) : path,
-  };
-}
-
-interface ProcessNamespaceParams {
-  translator: Translator;
-  concurrency: number;
-  ns: any;
-  sourceLanguage: string;
-  targetLanguage: string;
-  existing?: any;
-  only?: OnlySpec;
-  strict: boolean;
-}
-
-async function processNamespace({
-  translator,
-  concurrency,
-  ns,
-  sourceLanguage,
-  targetLanguage,
-  existing,
-  only,
-  strict,
-}: ProcessNamespaceParams): Promise<any> {
-  const flattened = flatten<any, Record<string, string>>(ns);
-  let ret = existing ? flatten<any, Record<string, string>>(existing) : {};
-
-  let sources = Object.entries(flattened);
-
-  if (only)
-    sources = sources.filter(([key]) =>
-      only.prefixMatch ? key.startsWith(only.path) : key === only.path,
-    );
-  else sources = sources.filter(([key]) => !ret[key]);
-
-  const chunks = chunk(sources, concurrency);
-  for (const currentChunk of chunks) {
-    const resp = await translator.translate(
-      Object.fromEntries(currentChunk),
-      sourceLanguage,
-      targetLanguage,
-    );
-
-    ret = {
-      ...ret,
-      ...resp,
-    };
-  }
-
-  if (strict) {
-    const keys = Object.entries(flattened).map(([key]) => key);
-
-    for (const key of Object.keys(ret)) {
-      if (!keys.includes(key)) delete ret[key];
-    }
-  }
-
-  return unflatten(ret, { object: false });
 }
 
 async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
+  const spinner = ora().start();
+
   const potentialTargets = await readdir(dictsPath);
   const potentialTargetStats = await Promise.all(
     potentialTargets.map(
       async (p) => [p, await stat(join(dictsPath, p))] as const,
     ),
   );
-  const targets = potentialTargetStats
+  const targetLocales = potentialTargetStats
     .filter(([, s]) => s.isDirectory())
     .filter(([path]) => {
       const result = REGEX_LANGUAGE_CODE.test(path);
@@ -125,28 +60,11 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
       return result;
     })
     .map(([path]) => path)
-    .filter((p) => p !== flags.sourceLanguage);
+    .filter((p) => p !== flags.sourceLocale);
 
-  let sources = await readdir(join(dictsPath, flags.sourceLanguage));
+  let sourceFiles = await readdir(join(dictsPath, flags.sourceLocale));
 
-  const only = flags.only;
-  if (only) sources = sources.filter((s) => s.split('.')[0] === only.namespace);
-
-  let translator: Translator;
-  switch (flags.provider) {
-    case 'AWS':
-      translator = new AwsTranslator();
-      break;
-    case 'OpenAI':
-      translator = new OpenAiTranslator();
-      break;
-    case 'Anthropic':
-      translator = new AnthropicTranslator();
-      break;
-    default:
-      throw new Error(`Unsupported provider: ${flags.provider}`);
-  }
-
+  const translator = getTranslator(flags.provider);
   const validationError = await translator.validateConfiguration();
   if (validationError) {
     console.log(
@@ -155,61 +73,101 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
     this.process.exit(1);
   }
 
-  const spinner = ora('Translating').start();
   try {
-    for (const source of sources) {
-      spinner.text = source;
-      const ext = extname(source);
+    const translationUnits: TranslationUnit[] = [];
 
-      let parse: Parser;
-      let serialize: Serializer;
+    for (const source of sourceFiles) {
+      spinner.text = `Checking ${source}`;
 
-      switch (ext) {
-        case '.json':
-          parse = JSON.parse;
-          serialize = (obj) => JSON.stringify(obj, null, 2);
-          break;
+      if (flags.only && !flags.only.key.matchesFilename(source)) continue;
 
-        case '.yaml':
-        case '.yml':
-          parse = yaml.parse;
-          serialize = (obj) => yaml.stringify(obj, { indent: 2 });
-          break;
-
-        case '.toml':
-          parse = toml.parse;
-          serialize = (obj) => toml.stringify(obj);
-          break;
-        default:
-          throw new Error(`Unsupported file extension: ${ext}`);
-      }
-
-      const ns = parse(
-        await readFile(join(dictsPath, flags.sourceLanguage, source), 'utf-8'),
+      const ns = await Namespace.fromFile(
+        join(dictsPath, flags.sourceLocale, source),
       );
 
-      for (const target of targets) {
+      for (const target of targetLocales) {
+        spinner.text = `Checking ${source} for ${target}`;
         const targetPath = join(dictsPath, target, source);
-        const existing = await readFile(targetPath, 'utf-8')
-          .then((t) => parse(t))
-          .catch(() => undefined);
+        const existing = await Namespace.fromFile(targetPath).catch(
+          () => new Namespace(),
+        );
 
-        const translation = await processNamespace({
-          translator,
-          concurrency: flags.concurrency,
-          ns,
-          targetLanguage: target,
-          sourceLanguage: flags.sourceLanguage,
-          existing,
-          only,
-          strict: flags.strict,
-        });
-        await writeFile(targetPath, serialize(translation) + '\n');
+        let units: TranslationUnit[] = ns.entries.map((e) => ({
+          sourceLocale: flags.sourceLocale,
+          targetLocale: target,
+          key: e.key,
+          sourceText: e.value,
+        }));
+
+        const only = flags.only;
+        if (only) {
+          units = units.filter((u) =>
+            only?.prefixMatch
+              ? u.key.toString().startsWith(only.key.toString())
+              : u.key.toString() === only.key.toString(),
+          );
+        } else {
+          units = units.filter((u) => !existing.hasKey(u.key));
+        }
+
+        translationUnits.push(...units);
       }
     }
-  } finally {
-    spinner.stop();
+
+    spinner.succeed(`Found ${translationUnits.length} keys to translate`);
+
+    spinner.start('Translating');
+    const translations = await translator.translate(
+      translationUnits,
+      flags.concurrency,
+    );
+    spinner.succeed('Translated');
+
+    spinner.start('Saving');
+    for (const source of sourceFiles) {
+      const filtered = translations.filter((t) =>
+        t.unit.key.matchesFilename(source),
+      );
+      if (filtered.length === 0) continue;
+
+      spinner.text = `Saving ${source}`;
+
+      for (const target of targetLocales) {
+        const localeFiltered = filtered.filter(
+          (t) => t.unit.targetLocale === target,
+        );
+        if (localeFiltered.length === 0) continue;
+
+        spinner.text = `Saving ${source} for ${target}`;
+
+        const targetPath = join(dictsPath, target, source);
+
+        const existing = await Namespace.fromFile(targetPath).catch(
+          () => new Namespace(),
+        );
+        const translated = new Namespace(
+          localeFiltered.map((t) => t.toNamespaceEntry()),
+        );
+
+        const result = existing.merge(translated);
+        await result.writeToFile(targetPath);
+      }
+    }
+
+    spinner.succeed('Saved');
+  } catch (err: any) {
+    spinner.fail();
+    console.log(err);
   }
+}
+
+function parseOnly(only: string): OnlySpec {
+  const prefixMatch = only.endsWith('*');
+  const key = TranslationKey.fromString(prefixMatch ? only.slice(0, -1) : only);
+  return {
+    prefixMatch,
+    key,
+  };
 }
 
 export const translateCommand = buildCommand({
@@ -227,7 +185,7 @@ export const translateCommand = buildCommand({
     },
 
     flags: {
-      sourceLanguage: {
+      sourceLocale: {
         kind: 'parsed',
         parse: String,
         brief: 'Source language',
@@ -258,7 +216,7 @@ export const translateCommand = buildCommand({
     },
 
     aliases: {
-      s: 'sourceLanguage',
+      s: 'sourceLocale',
       p: 'provider',
       o: 'only',
       c: 'concurrency',

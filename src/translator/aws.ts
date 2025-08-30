@@ -3,7 +3,8 @@ import {
   TranslateClient,
   TranslateTextCommand,
 } from '@aws-sdk/client-translate';
-import type { Translator } from './base';
+import chunk from 'lodash.chunk';
+import { Translation, type TranslationUnit, type Translator } from './base';
 
 export class AwsTranslator implements Translator {
   private readonly client: TranslateClient;
@@ -23,23 +24,35 @@ export class AwsTranslator implements Translator {
   }
 
   async translate(
-    sources: Record<string, string>,
-    sourceLanguage: string,
-    targetLanguage: string,
-  ): Promise<Record<string, string>> {
-    const outputEntries = await Promise.all(
-      Object.entries(sources).map(async ([key, value]) => {
-        const input = {
-          Text: value,
-          SourceLanguageCode: sourceLanguage,
-          TargetLanguageCode: targetLanguage,
-        };
-        const command = new TranslateTextCommand(input);
-        const response = await this.client.send(command);
-        return [key, response.TranslatedText!] as const;
-      }),
-    );
+    units: TranslationUnit[],
+    concurrency?: number,
+  ): Promise<Translation[]> {
+    concurrency = concurrency ?? 20;
+    if (concurrency > 20)
+      console.warn(
+        'AWS Translate does not support concurrency greater than 20. Defaulting to 20',
+      );
 
-    return Object.fromEntries(outputEntries);
+    const chunks = chunk(units, 20);
+    let output: Translation[] = [];
+
+    for (const current of chunks) {
+      const results = await Promise.all(
+        current.map(async (u) => {
+          const input = {
+            Text: u.sourceText,
+            SourceLanguageCode: u.sourceLocale,
+            TargetLanguageCode: u.targetLocale,
+          };
+          const command = new TranslateTextCommand(input);
+          const response = await this.client.send(command);
+          return new Translation(u, response.TranslatedText!);
+        }),
+      );
+
+      output.push(...results);
+    }
+
+    return output;
   }
 }

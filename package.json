@@ -4,7 +4,7 @@
   "author": "Affan Shahid <affan.shahid.94@gmail.com> (https://affanshahid.dev)",
   "license": "MIT",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "keywords": [
     "i18next",
     "auto",
@@ -49,6 +49,7 @@
     "lodash.chunk": "^4.2.0",
     "ora": "^8.2.0",
     "smol-toml": "^1.4.0",
+    "uuid": "^11.1.0",
     "yaml": "^2.8.0",
     "zod": "^3.25.67"
   },
