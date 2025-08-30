@@ -33,7 +33,7 @@ export class AwsTranslator implements Translator {
         'AWS Translate does not support concurrency greater than 20. Defaulting to 20',
       );
 
-    const chunks = chunk(units, 20);
+    const chunks = chunk(units, concurrency);
     let output: Translation[] = [];
 
     for (const current of chunks) {

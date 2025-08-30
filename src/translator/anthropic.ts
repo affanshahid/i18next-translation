@@ -51,7 +51,7 @@ export class AnthropicTranslator implements Translator {
     concurrency?: number,
   ): Promise<Translation[]> {
     concurrency = concurrency ?? 100;
-    const chunks = chunk(units);
+    const chunks = chunk(units, concurrency);
 
     const results: Translation[] = [];
     for (const current of chunks) {
@@ -80,10 +80,11 @@ export class AnthropicTranslator implements Translator {
     }
 
     const { object } = await generateObject({
-      model: anthropic('claude-3-5-haiku-latest'),
+      model: anthropic('claude-sonnet-4-0'),
       schema,
       prompt: userPrompt(unitsWithId),
       system: systemPrompt,
+      maxTokens: 64000,
     });
 
     const result: Translation[] = [];

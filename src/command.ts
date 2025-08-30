@@ -24,7 +24,7 @@ interface Flags {
   sourceLocale: string;
   provider: 'AWS' | 'OpenAI' | 'Anthropic';
   only?: OnlySpec;
-  concurrency: number;
+  concurrency?: number;
   strict: boolean;
 }
 
@@ -43,6 +43,10 @@ function getTranslator(provider: Flags['provider']): Translator {
 
 async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
   const spinner = ora().start();
+  process.on('SIGINT', () => {
+    spinner.stop();
+    process.exit(1);
+  });
 
   const potentialTargets = await readdir(dictsPath);
   const potentialTargetStats = await Promise.all(
@@ -207,7 +211,7 @@ export const translateCommand = buildCommand({
         kind: 'parsed',
         brief: 'Parallelization factor',
         parse: numberParser,
-        default: '10',
+        optional: true,
       },
       strict: {
         kind: 'boolean',

@@ -107,7 +107,7 @@ export class Namespace {
       this.entries.map((e) => [e.key.path, e.value]),
     );
 
-    return unflatten(obj, { object: false });
+    return unflatten(obj, { object: false, overwrite: true });
   }
 
   toKeyedObject(): Record<string, string> {

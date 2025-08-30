@@ -50,7 +50,7 @@ export class OpenAiTranslator implements Translator {
     concurrency?: number,
   ): Promise<Translation[]> {
     concurrency = concurrency ?? 100;
-    const chunks = chunk(units);
+    const chunks = chunk(units, concurrency);
 
     const results: Translation[] = [];
     for (const current of chunks) {

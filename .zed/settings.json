@@ -3,6 +3,7 @@
     "!deno",
     "!typescript-language-server",
     "!graphql",
+    "!eslint",
     "oxc",
     "..."
   ]
