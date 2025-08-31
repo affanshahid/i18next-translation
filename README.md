@@ -15,6 +15,7 @@ Automatically translate your i18next dictionaries using AI-powered translation s
 - 📄 **Multiple File Formats**: JSON, YAML, and TOML
 - 🔄 **Incremental Updates**: Only translate missing keys, preserving existing translations
 - 🧹 **Strict Mode**: Remove unused keys from target dictionaries
+- 🔍 **Translation Diagnosis**: Verify all keys are properly translated after translation
 - 🔧 **i18next Compatible**: Preserves placeholder syntax
 
 ## Requirements
@@ -47,7 +48,7 @@ npx i18next-translation [options] <dicts-path>
 ### Basic Usage
 
 ```bash
-i18next-translation -s en-US ./locales
+i18next-translation -l en-US ./locales
 ```
 
 This will translate all dictionaries from `en-US` to all other language directories found in `./locales`.
@@ -75,57 +76,65 @@ Language directories must follow ISO language codes (e.g., `en`, `es`, `fr`, `de
 
 ```bash
 # Use AWS (default -- must configure AWS credentials)
-i18next-translation -s en-US -p AWS ./locales
+i18next-translation -l en-US -p AWS ./locales
 
 # Use OpenAI (must set OPENAI_API_KEY)
-i18next-translation -s en-US -p OpenAI ./locales
+i18next-translation -l en-US -p OpenAI ./locales
 
 # Use Anthropic (must set ANTHROPIC_API_KEY)
-i18next-translation -s en-US -p Anthropic ./locales
+i18next-translation -l en-US -p Anthropic ./locales
 ```
 
 #### Translate Specific Namespace
 
 ```bash
 # Only translate the 'auth' namespace
-i18next-translation -s en-US --only "auth:*" ./locales
+i18next-translation -l en-US --only "auth:*" ./locales
 ```
 
 #### Translate Specific Keys
 
 ```bash
 # Translate specific key
-i18next-translation -s en-US --only "common:welcome" ./locales
+i18next-translation -l en-US --only "common:welcome" ./locales
 
 # Translate keys with prefix
-i18next-translation -s en-US --only "common:error.*" ./locales
+i18next-translation -l en-US --only "common:error.*" ./locales
 ```
 
 #### Control Concurrency
 
 ```bash
-# Process 5 keys simultaneously (default: 10)
-i18next-translation -s en-US --concurrency 5 ./locales
+# Process 5 keys simultaneously (default: 20)
+i18next-translation -l en-US --concurrency 5 ./locales
 ```
 
 #### Strict Mode
 
 ```bash
 # Remove keys that don't exist in source language
-i18next-translation -s en-US --strict ./locales
+i18next-translation -l en-US -s ./locales
+```
+
+#### Diagnosis Mode
+
+```bash
+# Check translation completeness after translation
+i18next-translation -l en-US -d ./locales
 ```
 
 ## Command Line Options
 
-| Option              | Alias | Description                                              | Default |
-| ------------------- | ----- | -------------------------------------------------------- | ------- |
-| `--source-language` | `-s`  | Source language code (required)                          | -       |
-| `--provider`        | `-p`  | Translation provider (`AWS`, `OpenAI`, `Anthropic`)      | `AWS`   |
-| `--only`            | `-o`  | Specific namespace:key to translate (supports wildcards) | -       |
-| `--concurrency`     | `-c`  | Number of concurrent translations                        | `10`    |
-| `--strict`          | -     | Remove keys not present in source dictionary             | `false` |
-| `--help`            | `-h`  | Show help                                                | -       |
-| `--version`         |       | Show version                                             | -       |
+| Option              | Alias | Description                                                    | Default |
+| ------------------- | ----- | -------------------------------------------------------------- | ------- |
+| `--source-language` | `-l`  | Source language code (required)                                | -       |
+| `--provider`        | `-p`  | Translation provider (`AWS`, `OpenAI`, `Anthropic`)            | `AWS`   |
+| `--only`            | `-o`  | Specific namespace:key to translate (supports wildcards)       | -       |
+| `--concurrency`     | `-c`  | Number of concurrent translations                              | `20`    |
+| `--strict`          | `-s`  | Remove keys not present in source dictionary                   | `false` |
+| `--diagnose`        | `-d`  | Check if all keys are detected as translated after translation | `false` |
+| `--help`            | `-h`  | Show help                                                      | -       |
+| `--version`         |       | Show version                                                   | -       |
 
 ## Setup
 
@@ -197,7 +206,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 ```json
 {
   "scripts": {
-    "translate": "i18next-translation -s en-US ./src/locales"
+    "translate": "i18next-translation -l en-US ./src/locales"
   }
 }
 ```
@@ -208,7 +217,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 {
   "husky": {
     "hooks": {
-      "pre-commit": "i18next-translation -s en-US --strict ./locales"
+      "pre-commit": "i18next-translation -l en-US -s ./locales"
     }
   }
 }
@@ -238,19 +247,22 @@ The tool validates language codes against ISO standards. If a directory is skipp
 
 ```bash
 # 1. Initial translation setup
-i18next-translation -s en-US ./locales
+i18next-translation -l en-US ./locales
 
 # 2. Add new keys to English files
 echo '{"newFeature": "New Feature"}' > locales/en/features.json
 
 # 3. Translate only new keys
-i18next-translation -s en-US ./locales
+i18next-translation -l en-US ./locales
 
 # 4. Translate specific namespace with OpenAI
-i18next-translation -s en-US -p OpenAI --only "marketing:*" ./locales
+i18next-translation -l en-US -p OpenAI --only "marketing:*" ./locales
 
 # 5. Clean up unused keys
-i18next-translation -s en-US --strict ./locales
+i18next-translation -l en-US -s ./locales
+
+# 6. Diagnose translation completeness
+i18next-translation -l en-US -d ./locales
 ```
 
 ## Contributing

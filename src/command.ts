@@ -1,7 +1,7 @@
 import { buildCommand, numberParser } from '@stricli/core';
 import chalk from 'chalk';
 import { readdir, stat } from 'fs/promises';
-import ora from 'ora';
+import ora, { type Ora } from 'ora';
 import { join } from 'path';
 import type { LocalContext } from './context';
 import { Namespace, TranslationKey } from './namespace';
@@ -26,6 +26,7 @@ interface Flags {
   only?: OnlySpec;
   concurrency?: number;
   strict: boolean;
+  diagnose: boolean;
 }
 
 function getTranslator(provider: Flags['provider']): Translator {
@@ -39,6 +40,62 @@ function getTranslator(provider: Flags['provider']): Translator {
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
+}
+
+async function extractTranslationUnits(
+  sourceLocale: string,
+  dictsPath: string,
+  sourceFiles: string[],
+  targetLocales: string[],
+  only?: OnlySpec,
+  spinner?: Ora,
+  diagnose?: boolean,
+): Promise<TranslationUnit[]> {
+  const translationUnits: TranslationUnit[] = [];
+
+  for (const source of sourceFiles) {
+    if (spinner) spinner.text = `Checking ${source}`;
+
+    if (only && !only.key.matchesFilename(source)) continue;
+
+    const ns = await Namespace.fromFile(join(dictsPath, sourceLocale, source));
+
+    for (const target of targetLocales) {
+      if (spinner) spinner.text = `Checking ${source} for ${target}`;
+      const targetPath = join(dictsPath, target, source);
+      const existing = await Namespace.fromFile(targetPath).catch(
+        () => new Namespace(),
+      );
+
+      let units: TranslationUnit[] = ns.entries.map((e) => ({
+        sourceLocale: sourceLocale,
+        targetLocale: target,
+        key: e.key,
+        sourceText: e.value,
+      }));
+
+      if (only && !diagnose) {
+        units = units.filter((u) =>
+          only?.prefixMatch
+            ? u.key.toString().startsWith(only.key.toString())
+            : u.key.toString() === only.key.toString(),
+        );
+      } else if (only && diagnose) {
+        units = units.filter((u) => !existing.has(u.key));
+        units = units.filter((u) =>
+          only?.prefixMatch
+            ? u.key.toString().startsWith(only.key.toString())
+            : u.key.toString() === only.key.toString(),
+        );
+      } else {
+        units = units.filter((u) => !existing.has(u.key));
+      }
+
+      translationUnits.push(...units);
+    }
+  }
+
+  return translationUnits;
 }
 
 async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
@@ -78,47 +135,16 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
   }
 
   try {
-    const translationUnits: TranslationUnit[] = [];
+    const translationUnits = await extractTranslationUnits(
+      flags.sourceLocale,
+      dictsPath,
+      sourceFiles,
+      targetLocales,
+      flags.only,
+      spinner,
+    );
 
-    for (const source of sourceFiles) {
-      spinner.text = `Checking ${source}`;
-
-      if (flags.only && !flags.only.key.matchesFilename(source)) continue;
-
-      const ns = await Namespace.fromFile(
-        join(dictsPath, flags.sourceLocale, source),
-      );
-
-      for (const target of targetLocales) {
-        spinner.text = `Checking ${source} for ${target}`;
-        const targetPath = join(dictsPath, target, source);
-        const existing = await Namespace.fromFile(targetPath).catch(
-          () => new Namespace(),
-        );
-
-        let units: TranslationUnit[] = ns.entries.map((e) => ({
-          sourceLocale: flags.sourceLocale,
-          targetLocale: target,
-          key: e.key,
-          sourceText: e.value,
-        }));
-
-        const only = flags.only;
-        if (only) {
-          units = units.filter((u) =>
-            only?.prefixMatch
-              ? u.key.toString().startsWith(only.key.toString())
-              : u.key.toString() === only.key.toString(),
-          );
-        } else {
-          units = units.filter((u) => !existing.has(u.key));
-        }
-
-        translationUnits.push(...units);
-      }
-    }
-
-    spinner.succeed(`Found ${translationUnits.length} keys to translate`);
+    spinner.succeed(`Found ${translationUnits.length} translations to perform`);
 
     spinner.start('Translating');
     const translations = await translator.translate(
@@ -157,20 +183,42 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
         );
         const result = existing.merge(translated);
 
-        if (flags.strict) {
-          const sourceKeys = ns.keys();
-
+        if (flags.strict)
           result
             .keys()
-            .filter((key) => !sourceKeys.includes(key))
+            .filter((key) => !ns.has(key))
             .forEach((key) => result.remove(key));
-        }
 
         await result.writeToFile(targetPath);
       }
     }
 
     spinner.succeed('Saved');
+
+    if (flags.diagnose) {
+      spinner.start('Diagnosing');
+
+      const untranslated = await extractTranslationUnits(
+        flags.sourceLocale,
+        dictsPath,
+        sourceFiles,
+        targetLocales,
+        flags.only,
+        spinner,
+        true,
+      );
+      const set = new Set(untranslated.map((t) => t.key.toString()));
+      const untranslatedKeys = [...set.values()];
+
+      if (set.size > 0) {
+        spinner.fail(
+          `The following ${untranslatedKeys.length} keys have structural inconsistencies`,
+        );
+        console.log(untranslatedKeys.map((t) => '  ' + t).join('\n'));
+      } else {
+        spinner.succeed('No issues found');
+      }
+    }
   } catch (err: any) {
     spinner.fail();
     console.log(err);
@@ -229,13 +277,19 @@ export const translateCommand = buildCommand({
         kind: 'boolean',
         brief: 'Only keep keys present in the source dictionary',
       },
+      diagnose: {
+        kind: 'boolean',
+        brief: 'Diagnose translation inconsistencies',
+      },
     },
 
     aliases: {
-      s: 'sourceLocale',
+      l: 'sourceLocale',
       p: 'provider',
       o: 'only',
       c: 'concurrency',
+      d: 'diagnose',
+      s: 'strict',
     },
   },
 
