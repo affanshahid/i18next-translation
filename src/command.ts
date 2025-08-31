@@ -111,7 +111,7 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
               : u.key.toString() === only.key.toString(),
           );
         } else {
-          units = units.filter((u) => !existing.hasKey(u.key));
+          units = units.filter((u) => !existing.has(u.key));
         }
 
         translationUnits.push(...units);
@@ -135,6 +135,9 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
       if (filtered.length === 0) continue;
 
       spinner.text = `Saving ${source}`;
+      const ns = await Namespace.fromFile(
+        join(dictsPath, flags.sourceLocale, source),
+      );
 
       for (const target of targetLocales) {
         const localeFiltered = filtered.filter(
@@ -152,8 +155,17 @@ async function translate(this: LocalContext, flags: Flags, dictsPath: string) {
         const translated = new Namespace(
           localeFiltered.map((t) => t.toNamespaceEntry()),
         );
-
         const result = existing.merge(translated);
+
+        if (flags.strict) {
+          const sourceKeys = ns.keys();
+
+          result
+            .keys()
+            .filter((key) => !sourceKeys.includes(key))
+            .forEach((key) => result.remove(key));
+        }
+
         await result.writeToFile(targetPath);
       }
     }

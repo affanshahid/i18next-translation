@@ -48,6 +48,7 @@ export interface NamespaceEntry {
 type Parser = (raw: string) => any;
 type Serializer = (obj: any) => string;
 
+// Represents a set of keys and their values
 export class Namespace {
   entries: NamespaceEntry[];
 
@@ -125,7 +126,17 @@ export class Namespace {
     return Namespace.fromKeyedObject(merged);
   }
 
-  hasKey(key: TranslationKey): boolean {
+  keys() {
+    return this.entries.map((e) => e.key);
+  }
+
+  remove(key: TranslationKey) {
+    this.entries = this.entries.filter(
+      (entry) => entry.key.toString() !== key.toString(),
+    );
+  }
+
+  has(key: TranslationKey): boolean {
     return this.entries.some(
       (entry) => entry.key.toString() === key.toString(),
     );
